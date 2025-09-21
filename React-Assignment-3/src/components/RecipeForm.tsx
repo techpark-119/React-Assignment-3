@@ -1,182 +1,218 @@
-import { useState, useEffect } from 'react';
-import { useDispatch } from 'react-redux';
-import { type Recipe, addRecipe, updateRecipe } from '../store/recipeSlice';
 
-interface RecipeFormProps {
-  recipe?: Recipe;
-  onClose: () => void;
-}
+import React, { useState, useEffect, useCallback } from 'react'
+import { useDispatch } from 'react-redux'
+import type { RecipeFormProps } from '../types'
+import { CATEGORIES } from '../types'
+import { addRecipe, updateRecipe } from '../store/recipeSlice'
+import { Modal, Input, Textarea, Select, Button } from './ui'
 
-const categories = ['Dessert', 'Main Course', 'Snack', 'Appetizer', 'Beverage'];
+const RecipeForm = React.memo<RecipeFormProps>(
+  ({ recipe, isOpen, onClose }) => {
+    const dispatch = useDispatch()
+    const [formData, setFormData] = useState({
+      name: '',
+      ingredients: '',
+      instructions: '',
+      imageUrl: '',
+      category: 'Main Course',
+      isFavorite: false,
+      prepTime: '',
+      servings: '',
+    })
 
-export default function RecipeForm({ recipe, onClose }: RecipeFormProps) {
-  const dispatch = useDispatch();
-  const [formData, setFormData] = useState({
-    name: '',
-    ingredients: '',
-    instructions: '',
-    imageUrl: '',
-    category: 'Main Course',
-    isFavorite: false,
-  });
+    useEffect(() => {
+      if (recipe) {
+        setFormData({
+          name: recipe.name,
+          ingredients: recipe.ingredients.join(', '),
+          instructions: recipe.instructions,
+          imageUrl: recipe.imageUrl,
+          category: recipe.category,
+          isFavorite: recipe.isFavorite,
+          prepTime: recipe.prepTime?.toString() || '',
+          servings: recipe.servings?.toString() || '',
+        })
+      } else if (isOpen) {
+        setFormData({
+          name: '',
+          ingredients: '',
+          instructions: '',
+          imageUrl: '',
+          category: 'Main Course',
+          isFavorite: false,
+          prepTime: '',
+          servings: '',
+        })
+      }
+    }, [recipe, isOpen])
 
-  useEffect(() => {
-    if (recipe) {
-      setFormData({
-        name: recipe.name,
-        ingredients: recipe.ingredients.join(', '),
-        instructions: recipe.instructions,
-        imageUrl: recipe.imageUrl,
-        category: recipe.category,
-        isFavorite: recipe.isFavorite,
-      });
-    }
-  }, [recipe]);
+    const handleSubmit = useCallback(() => {
+      if (
+        !formData.name.trim() ||
+        !formData.ingredients.trim() ||
+        !formData.instructions.trim()
+      ) {
+        alert('Please fill in all required fields')
+        return
+      }
 
-  const handleSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
-    
-    const recipeData = {
-      name: formData.name,
-      ingredients: formData.ingredients.split(',').map(i => i.trim()).filter(i => i),
-      instructions: formData.instructions,
-      imageUrl: formData.imageUrl,
-      category: formData.category,
-      isFavorite: formData.isFavorite,
-    };
+      const recipeData = {
+        name: formData.name.trim(),
+        ingredients: formData.ingredients
+          .split(',')
+          .map((i) => i.trim())
+          .filter(Boolean),
+        instructions: formData.instructions.trim(),
+        imageUrl: formData.imageUrl.trim(),
+        category: formData.category,
+        isFavorite: formData.isFavorite,
+        prepTime: formData.prepTime ? parseInt(formData.prepTime) : undefined,
+        servings: formData.servings ? parseInt(formData.servings) : undefined,
+      }
 
-    if (recipe) {
-      dispatch(updateRecipe({ ...recipeData, id: recipe.id }));
-    } else {
-      dispatch(addRecipe(recipeData));
-    }
-    
-    onClose();
-  };
+      if (recipe) {
+        dispatch(updateRecipe({ ...recipeData, id: recipe.id }))
+      } else {
+        dispatch(addRecipe(recipeData))
+      }
 
-  return (
-    <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4 z-50">
-      <div className="bg-white/95 backdrop-blur-xl rounded-3xl p-8 w-full max-w-2xl max-h-[90vh] overflow-y-auto border border-white/20 shadow-2xl">
-        <h2 className="text-3xl font-bold mb-8 text-transparent bg-clip-text bg-gradient-to-r from-purple-600 to-pink-600">
-          {recipe ? '✏️ Edit Recipe' : '✨ Add New Recipe'}
-        </h2>
-        
-        <form onSubmit={handleSubmit} className="space-y-6">
+      onClose()
+    }, [formData, recipe, dispatch, onClose])
+
+    const updateField = useCallback(
+      (field: string, value: string | boolean) => {
+        setFormData((prev) => ({ ...prev, [field]: value }))
+      },
+      []
+    )
+
+    return (
+      <Modal
+        isOpen={isOpen}
+        onClose={onClose}
+        title={recipe ? 'Edit Recipe' : 'Add New Recipe'}
+      >
+        <div className="p-6 space-y-4">
           <div>
-            <label className="block text-sm font-semibold text-gray-700 mb-2 flex items-center gap-2">
-              🍽️ Recipe Name *
+            <label className="block text-sm font-medium text-gray-700 mb-1">
+              Recipe Name *
             </label>
-            <input
+            <Input
               type="text"
               required
               value={formData.name}
-              onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-              className="w-full p-4 bg-white/70 backdrop-blur-sm border border-gray-200 rounded-xl focus:ring-2 focus:ring-purple-500 focus:border-transparent transition-all duration-300"
+              onChange={(e) => updateField('name', e.target.value)}
               placeholder="Enter recipe name"
             />
           </div>
 
+          <div className="grid grid-cols-2 gap-4">
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                Prep Time (minutes)
+              </label>
+              <Input
+                type="number"
+                value={formData.prepTime}
+                onChange={(e) => updateField('prepTime', e.target.value)}
+                placeholder="30"
+                min="1"
+              />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                Servings
+              </label>
+              <Input
+                type="number"
+                value={formData.servings}
+                onChange={(e) => updateField('servings', e.target.value)}
+                placeholder="4"
+                min="1"
+              />
+            </div>
+          </div>
+
           <div>
-            <label className="block text-sm font-semibold text-gray-700 mb-2 flex items-center gap-2">
-              🥗 Ingredients * (comma-separated)
+            <label className="block text-sm font-medium text-gray-700 mb-1">
+              Ingredients * (comma-separated)
             </label>
-            <textarea
+            <Textarea
               required
               value={formData.ingredients}
-              onChange={(e) => setFormData({ ...formData, ingredients: e.target.value })}
-              className="w-full p-4 bg-white/70 backdrop-blur-sm border border-gray-200 rounded-xl focus:ring-2 focus:ring-purple-500 focus:border-transparent transition-all duration-300 resize-none"
+              onChange={(e) => updateField('ingredients', e.target.value)}
               rows={3}
               placeholder="flour, sugar, eggs, butter"
             />
           </div>
 
           <div>
-            <label className="block text-sm font-semibold text-gray-700 mb-2 flex items-center gap-2">
-              📝 Instructions *
+            <label className="block text-sm font-medium text-gray-700 mb-1">
+              Instructions *
             </label>
-            <textarea
+            <Textarea
               required
               value={formData.instructions}
-              onChange={(e) => setFormData({ ...formData, instructions: e.target.value })}
-              className="w-full p-4 bg-white/70 backdrop-blur-sm border border-gray-200 rounded-xl focus:ring-2 focus:ring-purple-500 focus:border-transparent transition-all duration-300 resize-none"
+              onChange={(e) => updateField('instructions', e.target.value)}
               rows={4}
               placeholder="Step-by-step cooking instructions"
             />
           </div>
 
           <div>
-            <label className="block text-sm font-semibold text-gray-700 mb-2 flex items-center gap-2">
-              🖼️ Image URL
+            <label className="block text-sm font-medium text-gray-700 mb-1">
+              Image URL
             </label>
-            <input
+            <Input
               type="url"
               value={formData.imageUrl}
-              onChange={(e) => setFormData({ ...formData, imageUrl: e.target.value })}
-              className="w-full p-4 bg-white/70 backdrop-blur-sm border border-gray-200 rounded-xl focus:ring-2 focus:ring-purple-500 focus:border-transparent transition-all duration-300"
+              onChange={(e) => updateField('imageUrl', e.target.value)}
               placeholder="https://example.com/image.jpg"
             />
           </div>
 
           <div>
-            <label className="block text-sm font-semibold text-gray-700 mb-2 flex items-center gap-2">
-              🏷️ Category *
+            <label className="block text-sm font-medium text-gray-700 mb-1">
+              Category *
             </label>
-            <select
+            <Select
               required
               value={formData.category}
-              onChange={(e) => setFormData({ ...formData, category: e.target.value })}
-              className="w-full p-4 bg-white/70 backdrop-blur-sm border border-gray-200 rounded-xl focus:ring-2 focus:ring-purple-500 focus:border-transparent transition-all duration-300 cursor-pointer"
+              onChange={(e) => updateField('category', e.target.value)}
             >
-              {categories.map(category => (
-                <option key={category} value={category}>{category}</option>
+              {CATEGORIES.map((category) => (
+                <option key={category} value={category}>
+                  {category}
+                </option>
               ))}
-            </select>
+            </Select>
           </div>
 
-          <div className="flex items-center p-4 bg-gradient-to-r from-pink-50 to-purple-50 rounded-xl border border-pink-200">
+          <div className="flex items-center">
             <input
               type="checkbox"
               id="favorite"
               checked={formData.isFavorite}
-              onChange={(e) => setFormData({ ...formData, isFavorite: e.target.checked })}
-              className="mr-3 w-5 h-5 text-pink-500 rounded focus:ring-pink-500"
+              onChange={(e) => updateField('isFavorite', e.target.checked)}
+              className="h-4 w-4 text-indigo-600 rounded border-gray-300 focus:ring-indigo-500"
             />
-            <label htmlFor="favorite" className="text-sm font-semibold text-gray-700 flex items-center gap-2">
-              ❤️ Mark as favorite
+            <label htmlFor="favorite" className="ml-2 text-sm text-gray-700">
+              Mark as favorite
             </label>
           </div>
 
-          <div className="flex gap-4 pt-6">
-            <button
-              type="submit"
-              className="flex-1 bg-gradient-to-r from-purple-500 to-pink-600 text-white py-4 px-6 rounded-xl hover:from-purple-600 hover:to-pink-700 transition-all duration-300 font-semibold shadow-lg hover:shadow-xl hover:scale-105"
-            >
-              {recipe ? (
-                <>
-                  <svg className="w-5 h-5 mr-2" fill="currentColor" viewBox="0 0 20 20">
-                    <path d="M13.586 3.586a2 2 0 112.828 2.828l-.793.793-2.828-2.828.793-.793zM11.379 5.793L3 14.172V17h2.828l8.38-8.379-2.83-2.828z" />
-                  </svg>
-                  Update Recipe
-                </>
-              ) : (
-                <>
-                  <svg className="w-5 h-5 mr-2" fill="currentColor" viewBox="0 0 20 20">
-                    <path fillRule="evenodd" d="M6 2a2 2 0 00-2 2v12a2 2 0 002 2h8a2 2 0 002-2V7.414A2 2 0 0015.414 6L12 2.586A2 2 0 0010.586 2H6zm5 6a1 1 0 10-2 0v2H7a1 1 0 100 2h2v2a1 1 0 102 0v-2h2a1 1 0 100-2h-2V8z" />
-                  </svg>
-                  Add Recipe
-                </>
-              )}
-            </button>
-            <button
-              type="button"
-              onClick={onClose}
-              className="flex-1 bg-gradient-to-r from-gray-400 to-gray-500 text-white py-4 px-6 rounded-xl hover:from-gray-500 hover:to-gray-600 transition-all duration-300 font-semibold shadow-lg hover:shadow-xl hover:scale-105"
-            >
-              ❌ Cancel
-            </button>
+          <div className="flex gap-3 pt-4">
+            <Button onClick={handleSubmit} className="flex-1">
+              {recipe ? 'Update Recipe' : 'Add Recipe'}
+            </Button>
+            <Button variant="secondary" onClick={onClose} className="flex-1">
+              Cancel
+            </Button>
           </div>
-        </form>
-      </div>
-    </div>
-  );
-}
+        </div>
+      </Modal>
+    )
+  }
+)
+
+export default RecipeForm
